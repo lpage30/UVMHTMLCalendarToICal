@@ -1,0 +1,24 @@
+{
+  "name": "uvmhtmlcalendartoical",
+  "version": "1.0.0",
+  "description": "Converts HTML calendar page from UVM to ICal formatted file",
+  "type": "module",
+  "scripts": {
+    "ConvertToICal": "node ./main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lpage30/UVMHTMLCalendarToICal.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lpage30/UVMHTMLCalendarToICal/issues"
+  },
+  "homepage": "https://github.com/lpage30/UVMHTMLCalendarToICal#readme",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "node-fetch": "^3.3.1",
+    "uuid": "^9.0.0"
+  }
+}
