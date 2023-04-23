@@ -10,22 +10,25 @@ const months = [
     ['june', 'jun.', 'jun'],
     ['july', 'jul.', 'jul'],
     ['august', 'aug.', 'aug'],
-    ['september', 'sept.', 'sept'],
+    ['september', 'sept.', 'sept', 'sep'],
     ['october', 'oct.', 'oct'],
     ['november', 'nov.', 'nov'],
     ['december', 'dec.', 'dec'],
 ]
+function toMonthNumber(monthName) {
+    const searchMonth = monthName.toLowerCase()
+    const index = months.findIndex((monthNames => monthNames.includes(searchMonth)))
+    return index >= 0 ? index + 1 : undefined
+}
 function toYear(month, days, startYear, endYear) {
     if (startYear === endYear) {
         return startYear
     }
-    const searchMonth = month.toLowerCase()
-    const monthNo = months.findIndex((monthNames => monthNames.includes(searchMonth)))
-    if (monthNo === 7) {
+    if (month === 8) {
         const oldestDay = days.slice(-1)[0]
         return oldestDay > 15 ?  startYear : endYear
     }
-    return monthNo > 7 ? startYear : endYear
+    return month > 8 ? startYear : endYear
 }
 
 function toDays(daysExpression) {
@@ -50,7 +53,7 @@ function toDays(daysExpression) {
 
 function toMonthDaysYear(monthDay, startYear, endYear) {
     const spaceDelimValues = monthDay.trim().split(' ')
-    const month = spaceDelimValues[0].trim()
+    const month = toMonthNumber(spaceDelimValues[0].trim())
     const days = toDays(spaceDelimValues.slice(1).join(' ').trim())
     const year = toYear(month, days, startYear, endYear)
     return {
@@ -61,7 +64,7 @@ function toMonthDaysYear(monthDay, startYear, endYear) {
 }
 
 function parseYears(title) {
-    if (!title) {
+    if (!title || title.length === 0) {
         return undefined
     }
     const years = title.split(/[-, ]/)
@@ -139,7 +142,7 @@ function parseTableToCalendarRecords(tableElement, startYear, endYear) {
 
 }
 
-export async function loadCalendarPage(url) {
+export async function loadCalendarPage(url, calendarPageName) {
     const response = await fetch(url);
     const html = await response.text();
     const $ = cheerio.load(html);
@@ -147,9 +150,10 @@ export async function loadCalendarPage(url) {
     const fieldIntroduction = $('.field-introduction');
     const fieldBody = $('.field-body');
     if (fieldBody.length === 1) {
-        const title = fieldIntroduction.length === 1
+        const fieldTitle = (fieldIntroduction.length === 1
             ? fieldIntroduction.first().children().first().text()
-            : pageTitle.text();
+            : pageTitle.text()).trim();
+        const title = fieldTitle && fieldTitle.length > 0 ? fieldTitle : calendarPageName
         const years = parseYears(title)
         const calendars = Array.from(fieldBody.first().find('table'))
             .map(tableElement => parseTableToCalendarRecords(tableElement, years.startYear, years.endYear));
