@@ -71,7 +71,7 @@ function parseYears(title) {
         .map(value => value.trim())
         .filter(value => !isNaN(parseInt(value)))
         .map(value => parseInt(value))
-    return years.reduce((result, year) => {
+    const result = years.reduce((result, year) => {
         if (!result.startYear) {
             if (year > 2000) {
                 return {
@@ -92,46 +92,79 @@ function parseYears(title) {
             }
         }
     }, {})
+    return result.startYear ? result : undefined
+}
+function toUpdatedRecord(currentRecord, dataLabel, dataValue, years, cellIndex) {
+    const dataType = (dataLabel.length === 0 || dataLabel.startsWith('Registration'))
+        ? cellIndex === 0 ? 'Event' : 'Date'
+        : dataLabel
+    switch(dataType) {
+        case 'Event':
+            return {
+                ...currentRecord,
+                event: [ ...(currentRecord.event ?? []), ...dataValue]
+            }
+        case 'Date':
+            const other = dataValue.length > 1
+                ? {
+                    dateDetails: dataValue.slice(1).join('\n')
+                }
+                : {};
+            return {
+                ...currentRecord,
+                date: toMonthDaysYear(dataValue[0], years.startYear, years.endYear),
+                other: {
+                    ...(currentRecord.other ?? {}),
+                    ...other
+                }                
+            }
+        case 'Day of Week':
+            return {
+                ...currentRecord,
+                dow: dataValue.join('\n'),
+            }
+        default:
+            return {
+                ...currentRecord,
+                other: {
+                    ...(currentRecord.other ?? {}),
+                    [dataType]: dataValue.join('/n')
+                }
+            }
+    }
+}
+function getTextsFromElement(element) {
+    if (element.type === 'text') {
+        return [element.data];
+    }
+    return element.children.flatMap(getTextsFromElement)
+}
+function getElementsOfHTMLTag(element, htmlTag) {
+    if (element.name === htmlTag) {
+        return [element]
+    }
+    return element.children.filter(child => child.name === htmlTag)
 }
 
-function parseTableToCalendarRecords(tableElement, startYear, endYear) {
-    const captions = tableElement.children.filter(child => child.name === 'caption')
-    const tbodies = tableElement.children.filter(child => child.name === 'tbody' && child.children.length > 0)
-    const rows = tbodies.length === 0 ? [] : tbodies[0].children.filter(child => child.name === 'tr')
+function parseTableToCalendarRecords(tableElement, calendarYears) {
+    const captions = getElementsOfHTMLTag(tableElement, 'caption')
+    const tbodies = getElementsOfHTMLTag(tableElement, 'tbody')
+        .filter(body => body.children.length > 0)
+    const rows = tbodies.length === 0
+        ? [] 
+        : getElementsOfHTMLTag(tbodies[0], 'tr')
     
-    const title = captions.length > 0 ? captions[0].children.filter(child => child.type === 'text').map(child => child.data).join(' ') : undefined
-    const years = { startYear, endYear }
+    const title = captions.length > 0
+        ? getTextsFromElement(captions[0]).join(' ')
+        : undefined
+    const years = calendarYears || parseYears(title)
     const records = rows
-        .map(row => row.children.filter(child => child.name === 'td'))
+        .map(row => getElementsOfHTMLTag(row, 'td'))
         .filter(cells => cells.length > 0)
-        .map(cells => cells.reduce((record, cell) => {
-            const dataLabel = cell.attribs['data-label']
-            const value = cell.data ?? cell.children.filter(child => child.type === 'text').map(child => child.data).join(' ')
-            switch(dataLabel) {
-                case 'Event':
-                    return {
-                        ...record,
-                        event: value
-                    }
-                case 'Date':
-                    return {
-                        ...record,
-                        date: toMonthDaysYear(value, years.startYear, years.endYear),
-                    }
-                case 'Day of Week':
-                    return {
-                        ...record,
-                        dow: value,
-                    }
-                default:
-                    return {
-                        ...record,
-                        other: {
-                            ...(record.other ?? {}),
-                            [dataLabel]: value
-                        }
-                    }
-            }
+        .map(cells => cells.reduce((record, cell, index) => {
+            const dataLabel = (cell.attribs['data-label'] ?? '').trim()
+            const value = getTextsFromElement(cell)
+            return toUpdatedRecord(record, dataLabel, value, years, index);
         }, {}))
         return {
             title,
@@ -156,7 +189,7 @@ export async function loadCalendarPage(url, calendarPageName) {
         const title = fieldTitle && fieldTitle.length > 0 ? fieldTitle : calendarPageName
         const years = parseYears(title)
         const calendars = Array.from(fieldBody.first().find('table'))
-            .map(tableElement => parseTableToCalendarRecords(tableElement, years.startYear, years.endYear));
+            .map(tableElement => parseTableToCalendarRecords(tableElement, years));
         return {
             title,
             calendars

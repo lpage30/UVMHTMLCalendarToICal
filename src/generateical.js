@@ -31,12 +31,35 @@ function toDates(calendarRecordDate) {
     }));
 }
 
-function toDescription(title, dow, other) {
-    return [ 
-        title || '',
-        dow || '',
-        ...Object.entries(other || {}).map(([key, value]) => `${key}: ${value}`)
-    ].map(item => item.trim()).filter(item => item.length > 0).join('\n');
+function toDescription(remainingEvent, title, dow, other) {
+    let description = {}
+    if (remainingEvent && remainingEvent.trim().length > 0) {
+        description = {
+            ...description,
+            details: remainingEvent
+        }
+    }
+    if (title && title.trim().length > 0) {
+        description = {
+            ...description,
+            title
+        }
+    }
+    if (dow && dow.trim().length > 0) {
+        description = {
+            ...description,
+            dow
+        }
+    }
+    description = {
+        ...description,
+        ...(other || {})
+    }
+    return Object.entries(description)
+        .map(([key, value]) => ([(key || '').trim(), (value || '').trim()]))
+        .filter(([key, value]) => (key.length + value.length) > 0)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join('\n');
 }
 
 function toICalEvents(calendarRecord, title) {
@@ -49,20 +72,33 @@ function toICalEvents(calendarRecord, title) {
             end,
             uid,
             allDay: true,
-            summary: event,
-            description: toDescription(title, dow, other),
+            summary: event[0],
+            description: toDescription(event.slice(1).join('\n'), title, dow, other),
         };
     });
 }
-
-export function toICalendar(loadedCalendarPage) {
+export function toNamedICalendarEvents(loadedCalendarPage) {
     const { title: iCalendarName, calendars } = loadedCalendarPage
-    const result = ical({
-        name: iCalendarName
-    });
-    calendars
+    return {
+        name: iCalendarName,
+        events: calendars
         .flatMap(({title, records}) => records.flatMap(record => toICalEvents(record, title)))
-        .sort((l, r) => sortDateAsc(l.start, r.start))
-        .forEach(event => result.createEvent(event));
+    }
+}
+
+export function toICalendar(namedICalendarEvents) {
+    const { name, events } = namedICalendarEvents;
+    if (!name || !events) {
+        return undefined
+    }
+
+    const result = ical({
+        name
+    });
+    events
+    .sort((l, r) => sortDateAsc(l.start, r.start))
+    .forEach(event => result.createEvent(event));
+
     return result;
 }
+
